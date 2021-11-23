@@ -146,13 +146,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anchor-multisig"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
-]
-
-[[package]]
 name = "anchor-syn"
 version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -485,6 +478,13 @@ dependencies = [
  "cfg-if 1.0.0",
  "libc",
  "wasi",
+]
+
+[[package]]
+name = "goldmandao-multisig"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
 ]
 
 [[package]]

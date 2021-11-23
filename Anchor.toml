@@ -1,12 +1,12 @@
 [programs.localnet]
-anchor_multisig = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+goldmandao_multisig = "D3ogHpj4ZXexUjWCo2Y1PKZsKVHPY7x4whCCCyq5kHsx"
 
 [registry]
 url = "https://anchor.projectserum.com"
 
 [provider]
 cluster = "localnet"
-wallet = "/Users/sensei/.config/solana/id.json"
+wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
