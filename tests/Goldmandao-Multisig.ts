@@ -13,7 +13,6 @@ describe('GoldmanDAO-Multisig', () => {
   const provider = anchor.Provider.local();
   anchor.setProvider(provider);
 
-  const signer = anchor.web3.Keypair.generate()
   const program = anchor.workspace.GoldmandaoMultisig as Program<GoldmandaoMultisig>;
 
   // All mints default to 6 decimal places.
@@ -22,7 +21,9 @@ describe('GoldmanDAO-Multisig', () => {
 
   it('Is initialized!', async () => {
     // We give money to the "signer"
-    await requestAirdrop({provider, pubKey: signer.publicKey});
+    // const signer = anchor.web3.Keypair.generate()
+    // await requestAirdrop({provider, pubKey: signer.publicKey});
+
     let bumps = new PoolBumps();
 
     // We need the program as authority so it can tranfer funds
@@ -54,6 +55,39 @@ describe('GoldmanDAO-Multisig', () => {
       }
     )
     console.log("Transaction is: ", tx)
+
+    const [userRedeemable] = await anchor.web3.PublicKey.findProgramAddress(
+      [provider.wallet.publicKey.toBuffer(),
+      Buffer.from(daoName),
+      Buffer.from("user_redeemable")],
+      program.programId
+    );
+
+    const mintTx = await program.rpc.mintTokens(
+      {
+        accounts: {
+          userAuthority: provider.wallet.publicKey,
+          userRedeemable,
+          daoAccount,
+          redeemableMint,
+          tokenProgram: TOKEN_PROGRAM_ID
+        },
+        instructions: [
+          program.instruction.initUserRedeemable({
+            accounts: {
+              userAuthority: provider.wallet.publicKey,
+              userRedeemable,
+              daoAccount,
+              redeemableMint,
+              systemProgram: anchor.web3.SystemProgram.programId,
+              tokenProgram: TOKEN_PROGRAM_ID,
+              rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+            }
+          })
+        ]
+      },
+    );
+    console.log("Transaction is: ", mintTx)
   });
   function PoolBumps() {
     this.daoAccount;
