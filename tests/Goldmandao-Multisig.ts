@@ -1,14 +1,12 @@
 import * as anchor from '@project-serum/anchor';
-import { Program } from '@project-serum/anchor';
+import { IdlAccounts, Program } from '@project-serum/anchor';
+const serumCmn = require("@project-serum/common");
 import { TOKEN_PROGRAM_ID, Token } from "@solana/spl-token";
 
 import { GoldmandaoMultisig } from '../target/types/goldmandao_multisig';
 import assert from "assert";
 
-// const { SystemProgram } = anchor.web3;
-
 describe('GoldmanDAO-Multisig', () => {
-
   // Configure the client to use the local cluster.
   const provider = anchor.Provider.local();
   anchor.setProvider(provider);
@@ -19,43 +17,61 @@ describe('GoldmanDAO-Multisig', () => {
   const daoTokenAmount = new anchor.BN(5000000)
   const daoName = 'test_dao'
 
-  it('Is initialized!', async () => {
-    // We give money to the "signer"
-    // const signer = anchor.web3.Keypair.generate()
-    // await requestAirdrop({provider, pubKey: signer.publicKey});
+  var bumps, daoAccount, daoAccountBump, redeemableMint, redeemableMintBump
 
-    let bumps = new PoolBumps();
+  beforeEach(async () => {
+    // Bumps are used to create PDA's. Their type y just a number from 0..256
+    bumps = {
+      daoAccount: undefined,
+      redeemableMint: undefined
+    }
 
-    // We need the program as authority so it can tranfer funds
-    const [daoAccount, daoAccountBump] = await anchor.web3.PublicKey.findProgramAddress(
-        [Buffer.from(daoName)],
-        program.programId
+    // We get the account and the bump of the GoldmanDAO multisig program
+    const [_daoAccount, _daoAccountBump] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from(daoName)],
+      program.programId
     )
+    daoAccount = _daoAccount
+    daoAccountBump = _daoAccountBump
     bumps.daoAccount = daoAccountBump
 
-    const [redeemableMint, redeemableMintBump] = await anchor.web3.PublicKey.findProgramAddress(
+    // We get what is going to be the token of the dao.
+    // It's not yet deployed, but its address and bump can be obtained nonetheless
+    const [_redeemableMint, _redeemableMintBump] = await anchor.web3.PublicKey.findProgramAddress(
       [Buffer.from(daoName), Buffer.from("redeemable_mint")],
       program.programId
     );
+    redeemableMint = _redeemableMint
+    redeemableMintBump = _redeemableMintBump
     bumps.redeemableMint = redeemableMintBump;
+  })
 
+  it('should initialize the dao', async () => {
+    // This is the first tx
+    // It creates the Accunts for:
+    // - daoAccount: The program storage
+    // - redeemableMint: The PDA Token
     const tx = await program.rpc.initializeDao(
       daoName,
-      bumps,
+      bumps, // They are stored so we don't need to calculate them again
       daoTokenAmount,
       {
         accounts: {
-          daoAuthority: provider.wallet.publicKey,
+          daoAuthority: provider.wallet.publicKey, // The authority is set to our address
           daoAccount,
           redeemableMint,
           systemProgram: anchor.web3.SystemProgram.programId,
-          tokenProgram: TOKEN_PROGRAM_ID,
-          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+          tokenProgram: TOKEN_PROGRAM_ID, // The Program Code (stores things in the address you send)
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY, // To get the current rent
         },
       }
     )
-    console.log("Transaction is: ", tx)
+    // Having a hard time trying to test this
+    // let resultAccount = await program.account.daoAccount.fetch(daoAccount.toString())
+    // assert(resultAccount.numDaoTokens.eq(daoTokenAmount))
+  });
 
+  it('should mint tokens to the owner', async () => {
     const [userRedeemable] = await anchor.web3.PublicKey.findProgramAddress(
       [provider.wallet.publicKey.toBuffer(),
       Buffer.from(daoName),
@@ -87,30 +103,9 @@ describe('GoldmanDAO-Multisig', () => {
         ]
       },
     );
-    console.log("Transaction is: ", mintTx)
+    let userRedeemableAccount = await serumCmn.getTokenAccount(provider, userRedeemable);
+    assert(userRedeemableAccount.amount.eq(new anchor.BN(100)))
   });
-  function PoolBumps() {
-    this.daoAccount;
-    this.redeemableMint;
-  };
 });
-
-
-const createToken = async ({ provider, wallet, mintAuthority }) =>
-  Token.createMint(
-    provider.connection,
-    wallet,
-    mintAuthority,
-    null,
-    8,
-    TOKEN_PROGRAM_ID
-  )
-
-
-const requestAirdrop = async ({ provider, pubKey }) =>
-    await provider.connection.confirmTransaction(
-      await provider.connection.requestAirdrop(pubKey, 10000000000),
-      "confirmed"
-    );
 
 
