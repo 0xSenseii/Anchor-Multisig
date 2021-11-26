@@ -17,7 +17,6 @@ pub mod goldmandao_multisig {
         bumps: PoolBumps,
         num_tokens: u64,
     ) -> ProgramResult {
-        msg!("INIT DAO");
         let dao_account = &mut ctx.accounts.dao_account;
 
         let name_bytes = dao_name.as_bytes();
@@ -27,6 +26,13 @@ pub mod goldmandao_multisig {
         dao_account.dao_name = name_data;
         dao_account.bumps = bumps;
         dao_account.dao_authority = ctx.accounts.dao_authority.key();
+        dao_account.admins = [
+            dao_account.dao_authority,
+            dao_account.key(),
+            dao_account.key(),
+            dao_account.key(),
+            dao_account.key(),
+        ];
         dao_account.redeemable_mint = ctx.accounts.redeemable_mint.key();
         dao_account.num_dao_tokens = num_tokens;
 
@@ -34,11 +40,19 @@ pub mod goldmandao_multisig {
     }
 
     pub fn init_user_redeemable(_ctx: Context<InitUserRedeemable>) -> ProgramResult {
-        msg!("INIT USER REDEEMABLE");
         Ok(())
     }
 
     pub fn mint_tokens(ctx: Context<MintOwnership>) -> ProgramResult {
+        require!(
+            ctx.accounts
+                .dao_account
+                .admins
+                .iter()
+                .position(|&a| a == ctx.accounts.user_authority.key())
+                .is_some(),
+            InvalidAuth
+        );
         let dao_name = ctx.accounts.dao_account.dao_name.as_ref();
         let seeds = &[
             dao_name.trim_ascii_whitespace(),
@@ -56,7 +70,6 @@ pub mod goldmandao_multisig {
 
         let cpi_program = ctx.accounts.token_program.to_account_info();
         let cpi_context = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
-        msg!("INIT MINTING");
         token::mint_to(cpi_context, amount)?;
 
         Ok(())
@@ -143,6 +156,7 @@ pub struct MintOwnership<'info> {
 pub struct DAOAccount {
     pub dao_name: [u8; 10], // Setting an arbitrary max of ten characters in the ido name.
     pub bumps: PoolBumps,
+    pub admins: [Pubkey; 5],
     pub dao_authority: Pubkey,
     pub redeemable_mint: Pubkey,
     pub num_dao_tokens: u64,
@@ -170,4 +184,10 @@ impl<T: Deref<Target = [u8]>> TrimAsciiWhitespace for T {
         let to = self.iter().rposition(|x| !x.is_ascii_whitespace()).unwrap();
         &self[from..=to]
     }
+}
+
+#[error]
+pub enum ErrorCode {
+    #[msg("Invalid auth token provided")]
+    InvalidAuth,
 }

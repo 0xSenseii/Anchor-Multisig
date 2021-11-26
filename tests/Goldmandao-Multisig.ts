@@ -79,7 +79,7 @@ describe('GoldmanDAO-Multisig', () => {
       program.programId
     );
 
-    const mintTx = await program.rpc.mintTokens(
+    await program.rpc.mintTokens(
       {
         accounts: {
           userAuthority: provider.wallet.publicKey,
@@ -106,6 +106,54 @@ describe('GoldmanDAO-Multisig', () => {
     let userRedeemableAccount = await serumCmn.getTokenAccount(provider, userRedeemable);
     assert(userRedeemableAccount.amount.eq(new anchor.BN(100)))
   });
+
+  it('should fail minting tokens to an outsider', async () => {
+    const outsiderAccount = anchor.web3.Keypair.generate();
+    await requestAirdrop({ provider, pubKey: outsiderAccount.publicKey });
+
+    const [userRedeemable] = await anchor.web3.PublicKey.findProgramAddress(
+      [outsiderAccount.publicKey.toBuffer(),
+      Buffer.from(daoName),
+      Buffer.from("user_redeemable")],
+      program.programId
+    );
+
+    try {
+      await program.rpc.mintTokens(
+        {
+          accounts: {
+            userAuthority: outsiderAccount.publicKey,
+            userRedeemable,
+            daoAccount,
+            redeemableMint,
+            tokenProgram: TOKEN_PROGRAM_ID
+          },
+          signers: [outsiderAccount],
+          instructions: [
+            program.instruction.initUserRedeemable({
+              accounts: {
+                userAuthority: outsiderAccount.publicKey,
+                userRedeemable,
+                daoAccount,
+                redeemableMint,
+                systemProgram: anchor.web3.SystemProgram.programId,
+                tokenProgram: TOKEN_PROGRAM_ID,
+                rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+              }
+            })
+          ]
+        },
+      );
+      assert(false)
+    } catch (e) {
+      assert(true)
+    }
+  });
 });
 
 
+const requestAirdrop = async ({ provider, pubKey }) =>
+  await provider.connection.confirmTransaction(
+    await provider.connection.requestAirdrop(pubKey, 10000000000),
+    "confirmed"
+  );
